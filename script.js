@@ -5,10 +5,6 @@ function saveLog() {
   localStorage.setItem("sleepLog", JSON.stringify(sleepLog));
 }
 
-// function startSleep() {
-//   startTime = new Date();
-//   alert("Sleep started at " + startTime.toLocaleTimeString());
-// }
 function startSleep() {
     if (startTime) {
       alert("🛑 Sleep already started at " + startTime.toLocaleTimeString() + ". End it before starting a new one.");
