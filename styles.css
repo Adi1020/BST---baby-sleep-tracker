@@ -1,58 +1,126 @@
 body {
-    font-family: sans-serif;
-    margin: 0;
-    padding: 0;
-    background: #f9f9f9;
-    color: #333;
-  }
-  
-  header, footer {
-    background-color: #6ab7ff;
-    color: white;
-    padding: 1em;
-    text-align: center;
-  }
-  
-  main {
-    padding: 1em;
-    max-width: 700px;
-    margin: auto;
-  }
-  
-  .buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5em;
-    justify-content: center;
-    margin-bottom: 1em;
-  }
-  
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f9f9f9;
+  color: #333;
+}
+
+header, footer {
+  background-color: #6ab7ff;
+  color: white;
+  padding: 1em;
+  text-align: center;
+}
+
+main {
+  padding: 1em;
+  max-width: 700px;
+  margin: auto;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  justify-content: center;
+  margin-bottom: 1em;
+}
+
+button {
+  flex: 1 1 45%;
+  padding: 0.8em;
+  border: none;
+  background: #0288d1;
+  color: white;
+  font-size: 1em;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #026fa4;
+}
+
+.date-search {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5em;
+  margin-bottom: 1em;
+}
+
+.date-search input,
+.date-search button {
+  padding: 0.5em;
+  font-size: 1em;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+#log-output {
+  white-space: pre-wrap;
+  background: #fff;
+  padding: 1em;
+  border-radius: 6px;
+  box-shadow: 0 0 5px #ccc;
+  margin: 1em auto;
+  max-width: 700px;
+}
+
+#back-button {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1em;
+}
+
+.hidden {
+  display: none;
+}
+
+.chart-container canvas {
+  margin: 1em auto;
+  max-width: 100%;
+  display: block;
+}
+
+/* Dark mode styles */
+body.dark {
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+body.dark header,
+body.dark footer {
+  background-color: #1f1f1f;
+}
+
+body.dark main,
+body.dark #log-output {
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+}
+
+body.dark button {
+  background-color: #333;
+  color: #fff;
+}
+
+body.dark button:hover {
+  background-color: #555;
+}
+
+.theme-toggle {
+  text-align: right;
+  padding: 0.5em 1em;
+}
+
+@media (max-width: 600px) {
   button {
-    flex: 1 1 45%;
-    padding: 0.8em;
-    border: none;
-    background: #0288d1;
-    color: white;
-    font-size: 1em;
-    border-radius: 8px;
-    cursor: pointer;
+    flex: 1 1 100%;
   }
-  
-  button:hover {
-    background: #026fa4;
+  .date-search {
+    flex-direction: column;
+    align-items: center;
   }
-  
-  #log-output {
-    white-space: pre-wrap;
-    background: #fff;
-    padding: 1em;
-    border-radius: 6px;
-    box-shadow: 0 0 5px #ccc;
-  }
-  
-  @media (max-width: 600px) {
-    button {
-      flex: 1 1 100%;
-    }
-  }
-  
+}
