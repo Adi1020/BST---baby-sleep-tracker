@@ -1,19 +1,7 @@
-/*
-  Baby Sleep Tracker
-  Version: 1.2.2
-  Last Updated: 2025-05-06 
-  Features:
-  - Feed status prompt after sleep session
-  - Back button visible only on non-default views (summary/chart)
-  - Back button hidden on page load and sleep start
-  - Dark mode persisted
-  - Chart.js visual insights
-  - Export and clipboard support
-  - PWA/mobile optimized
-*/
-
 let sleepLog = JSON.parse(localStorage.getItem("sleepLog")) || [];
 let startTime = localStorage.getItem("startTime") ? new Date(localStorage.getItem("startTime")) : null;
+
+let barChartInstance, pieChartInstance, lineChartInstance, feedStackedInstance;
 
 function saveLog() {
   localStorage.setItem("sleepLog", JSON.stringify(sleepLog));
@@ -26,7 +14,7 @@ function startSleep() {
   }
   startTime = new Date();
   localStorage.setItem("startTime", startTime.toISOString());
-  document.getElementById("back-button").classList.add("hidden"); // hide if was shown
+  document.getElementById("back-button").classList.add("hidden");
   alert("✅ Sleep started at " + startTime.toLocaleTimeString());
 }
 
@@ -90,6 +78,8 @@ function returnToMain() {
   document.getElementById("log-output").classList.add("hidden");
   document.getElementById("chart-section").classList.add("hidden");
   document.getElementById("back-button").classList.add("hidden");
+  document.getElementById("copy-summary-btn").classList.add("hidden");
+  document.getElementById("summary-text").textContent = ""; 
 }
 
 function displayLogs(logs, title) {
@@ -112,18 +102,24 @@ function displayLogs(logs, title) {
     output += `🍽️ Feeding: ${feedCounts.before} before, ${feedCounts.after} after, ${feedCounts.none} none\n\n`;
 
     logs.forEach(log => {
-      const durSec = toSeconds(log.duration);
-      const durMin = Math.round(durSec / 60);
+      const durMin = Math.round(toSeconds(log.duration) / 60);
       const h = Math.floor(durMin / 60);
-      const min = durMin % 60;
-      const durStr = h ? `${h}h ${min}m` : `${min}m`;
+      const m = durMin % 60;
+      const durStr = h ? `${h}h ${m}m` : `${m}m`;
       output += `🕒 ${log.startTime.slice(0,5)} → ${log.endTime.slice(0,5)} | ${durStr} | 💤 ${log.sessionType} | 🍽️ ${log.feeding}\n`;
     });
+
   }
 
-  document.getElementById("log-output").textContent = output;
-  showView("log");
+  // Display and show all relevant sections
+  document.getElementById("summary-text").textContent = output;
+  document.getElementById("main-ui").classList.add("hidden");
+  document.getElementById("chart-section").classList.add("hidden");
+  document.getElementById("log-output").classList.remove("hidden");
+  document.getElementById("copy-summary-btn").classList.remove("hidden");
+  document.getElementById("back-button").classList.remove("hidden");
 }
+
 
 function showToday() {
   const today = new Date().toISOString().split("T")[0];
@@ -178,8 +174,110 @@ function exportToExcel() {
 }
 
 function copySummary() {
-  const text = document.getElementById("log-output").textContent;
-  navigator.clipboard.writeText(text).then(() => alert("📋 Copied to clipboard!"));
+  const text = document.getElementById("summary-text").textContent;
+  if (!text.trim()) return alert("ℹ️ Nothing to copy.");
+  navigator.clipboard.writeText(text).then(() => alert("📋 Summary copied!"));
+}
+
+function showChart() {
+  showView("chart");
+
+  [barChartInstance, pieChartInstance, lineChartInstance, feedStackedInstance].forEach(c => c?.destroy());
+
+  const grouped = {}, typeTotals = { Nap: 0, "Mid Nap": 0, "Sleep Session": 0 };
+  const feedByDate = {}, avgSessionLengths = {}, dayMap = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekBuckets = Object.fromEntries(dayMap.map(d => [d, 0]));
+
+  sleepLog.forEach(log => {
+    const d = log.date;
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(log);
+    typeTotals[log.sessionType]++;
+    feedByDate[d] = feedByDate[d] || { before: 0, after: 0, none: 0 };
+    feedByDate[d][log.feeding]++;
+    avgSessionLengths[d] = avgSessionLengths[d] || [];
+    avgSessionLengths[d].push(toSeconds(log.duration));
+    weekBuckets[dayMap[new Date(d).getDay()]] += toSeconds(log.duration) / 60;
+  });
+
+  const dates = Object.keys(grouped).sort();
+  const ctx = id => document.getElementById(id).getContext("2d");
+
+  barChartInstance = new Chart(ctx("barChart"), {
+    type: "bar",
+    data: {
+      labels: dates,
+      datasets: [{
+        label: "Total Sleep (min)",
+        data: dates.map(d => grouped[d].reduce((s,l)=>s+toSeconds(l.duration),0)/60),
+        backgroundColor: "#4fc3f7"
+      }]
+    },
+    options: { plugins: { title: { display: true, text: "📊 Total Sleep per Day" } } }
+  });
+
+  pieChartInstance = new Chart(ctx("typePieChart"), {
+    type: "pie",
+    data: {
+      labels: Object.keys(typeTotals),
+      datasets: [{
+        data: Object.values(typeTotals),
+        backgroundColor: ["#81c784", "#ffb74d", "#9575cd"]
+      }]
+    },
+    options: { plugins: { title: { display: true, text: "🧁 Session Type Breakdown" } } }
+  });
+
+  const avg7 = [];
+  for (let i = 0; i < dates.length; i++) {
+    const last7 = dates.slice(Math.max(0, i - 6), i + 1);
+    const total = last7.reduce((sum, d) =>
+      sum + (avgSessionLengths[d]?.reduce((a,b)=>a+b,0) || 0), 0);
+    const count = last7.reduce((sum, d) =>
+      sum + (avgSessionLengths[d]?.length || 0), 0);
+    avg7.push(Math.round(total / count / 60));
+  }
+
+  lineChartInstance = new Chart(ctx("lineChart"), {
+    type: "line",
+    data: {
+      labels: dates,
+      datasets: [{
+        label: "Avg Session (min)",
+        data: dates.map(d =>
+          Math.round(avgSessionLengths[d].reduce((a,b)=>a+b,0)/avgSessionLengths[d].length/60)
+        ),
+        borderColor: "#ff7043",
+        fill: false
+      }, {
+        label: "7-Day Avg",
+        data: avg7,
+        borderColor: "#9c27b0",
+        borderDash: [5, 5],
+        fill: false
+      }]
+    },
+    options: { plugins: { title: { display: true, text: "📈 Avg Session Duration by Day" } } }
+  });
+
+  feedStackedInstance = new Chart(ctx("feedStackedChart"), {
+    type: "bar",
+    data: {
+      labels: dates,
+      datasets: ["before", "after", "none"].map((f, i) => ({
+        label: `Fed ${f}`,
+        data: dates.map(d => feedByDate[d]?.[f] || 0),
+        backgroundColor: ["#aed581", "#ff8a65", "#90a4ae"][i]
+      }))
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: { display: true, text: "🍽️ Feeding Status per Day" }
+      },
+      scales: { x: { stacked: true }, y: { stacked: true } }
+    }
+  });
 }
 
 function toggleDarkMode() {
@@ -189,11 +287,8 @@ function toggleDarkMode() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  // Apply dark mode
   const saved = localStorage.getItem("darkMode") === "true";
   document.getElementById("darkToggle").checked = saved;
   document.body.classList.toggle("dark", saved);
-
-  // Ensure back button is hidden on page load
   document.getElementById("back-button").classList.add("hidden");
 });

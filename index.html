@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Baby Sleep Tracker</title>
   <link rel="icon" type="image/x-icon" href="./favicon.ico">
-  
-      <!-- PWA Meta + Icons -->
+
+  <!-- PWA Meta + Icons -->
   <link rel="manifest" href="./manifest.json" />
   <link rel="apple-touch-icon" href="./sleep.png" />
   <meta name="theme-color" content="#6ab7ff" />
@@ -31,18 +31,22 @@
       <button onclick="endSleep()">👻 End Sleep</button>
       <button onclick="showToday()">🗓️ Today’s Summary</button>
       <button onclick="showAll()">📊 All Sessions</button>
+      <!-- <button onclick="copySummary()">📋 Copy Summary</button> -->
       <button onclick="exportToExcel()">💾 Export to Excel</button>
-      <button onclick="copySummary()">📋 Copy Summary</button>
       <button onclick="showChart()">📈 Visual Summary</button>
     </div>
 
     <div class="date-search">
       <input type="date" id="date-input" />
-      <button onclick="searchByDate()">🕒 Search by Date</button>
+      <button onclick="searchByDate()">🔍 Search</button>
     </div>
   </main>
 
-  <section id="log-output" class="hidden"></section>
+  <section id="log-output" class="hidden">
+    <button id="copy-summary-btn" onclick="copySummary()">📋 Copy Summary</button>
+    <pre id="summary-text"></pre>
+  </section>
+  
 
   <div id="chart-section" class="hidden chart-container">
     <canvas id="barChart"></canvas>
@@ -60,17 +64,17 @@
     <p>© 🃏 POCO_dev</p>
   </footer>
 
-    <!-- SheetJS Excel support -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="./script.js"></script>
-  
-    <!-- Register service worker -->
-    <script>
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("service-worker.js")
-          .then(() => console.log("✅ Service Worker Registered"))
-          .catch(err => console.log("❌ Service Worker Failed", err));
-      }
-      </script>
+  <!-- SheetJS Excel support -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="./script.js"></script>
+
+  <!-- Register service worker -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js")
+        .then(() => console.log("✅ Service Worker Registered"))
+        .catch(err => console.log("❌ Service Worker Failed", err));
+    }
+    </script>
 </body>
 </html>
