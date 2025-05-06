@@ -1,6 +1,15 @@
-let sleepLog = JSON.parse(localStorage.getItem("sleepLog")) || [];
-let startTime = localStorage.getItem("startTime") ? new Date(localStorage.getItem("startTime")) : null;
+/*
+  Baby Sleep Tracker
+  System Version: 1.2.4 (with merged Chart.js logic)
+  Last Updated: 2025-05-06
+*/
 
+let sleepLog = JSON.parse(localStorage.getItem("sleepLog")) || [];
+let startTime = localStorage.getItem("startTime")
+  ? new Date(localStorage.getItem("startTime"))
+  : null;
+
+// Chart.js instances
 let barChartInstance, pieChartInstance, lineChartInstance, feedStackedInstance;
 
 function saveLog() {
@@ -9,12 +18,10 @@ function saveLog() {
 
 function startSleep() {
   if (startTime) {
-    alert("🛑 Sleep already started at " + startTime.toLocaleTimeString());
-    return;
+    return alert("🛑 Sleep already started at " + startTime.toLocaleTimeString());
   }
   startTime = new Date();
   localStorage.setItem("startTime", startTime.toISOString());
-  document.getElementById("back-button").classList.add("hidden");
   alert("✅ Sleep started at " + startTime.toLocaleTimeString());
 }
 
@@ -54,115 +61,132 @@ function toSeconds(timeStr) {
 }
 
 function formatDuration(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
+  const h = Math.floor(seconds / 3600),
+        m = Math.floor((seconds % 3600) / 60),
+        s = seconds % 60;
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-function showView(viewId) {
+// Switch between main, log, and chart views
+function showView(view) {
   document.getElementById("main-ui").classList.add("hidden");
   document.getElementById("log-output").classList.add("hidden");
   document.getElementById("chart-section").classList.add("hidden");
+  document.getElementById("copy-summary-btn").classList.add("hidden");
   document.getElementById("back-button").classList.remove("hidden");
 
-  if (viewId === "log") {
+  if (view === "log") {
     document.getElementById("log-output").classList.remove("hidden");
-  } else if (viewId === "chart") {
+  } else if (view === "chart") {
     document.getElementById("chart-section").classList.remove("hidden");
   }
 }
 
+// Return to main tracker UI
 function returnToMain() {
   document.getElementById("main-ui").classList.remove("hidden");
   document.getElementById("log-output").classList.add("hidden");
   document.getElementById("chart-section").classList.add("hidden");
-  document.getElementById("back-button").classList.add("hidden");
   document.getElementById("copy-summary-btn").classList.add("hidden");
-  document.getElementById("summary-text").textContent = ""; 
+  document.getElementById("summary-text").textContent = "";
+  document.getElementById("back-button").classList.add("hidden");
+
+  // Reflow hack for PWA fullscreen
+  const log = document.getElementById("log-output");
+  log.style.display = "none";
+  setTimeout(() => log.style.display = "", 10);
 }
 
+// Build and display a textual summary
 function displayLogs(logs, title) {
+  showView("log");
+
   let output = `${title}\n\n`;
   if (!logs.length) {
     output += "❌ No sessions found.";
   } else {
-    const total = logs.reduce((acc, log) => acc + toSeconds(log.duration), 0);
-    const avgMin = Math.round(total / logs.length / 60);
+    const total = logs.reduce((sum, l) => sum + toSeconds(l.duration), 0);
+    const avgMin = Math.round(total / (logs.length * 60));
     const typeCounts = { Nap: 0, "Mid Nap": 0, "Sleep Session": 0 };
     const feedCounts = { before: 0, after: 0, none: 0 };
 
-    logs.forEach(log => {
-      typeCounts[log.sessionType]++;
-      feedCounts[log.feeding]++;
+    logs.forEach(l => {
+      typeCounts[l.sessionType]++;
+      feedCounts[l.feeding]++;
     });
 
     output += `🛌 ${logs.length} sessions | ⏱ Total: ${formatDuration(total)} | 🧮 Avg: ${avgMin}m\n`;
     output += `📊 Types: ${typeCounts.Nap} Nap, ${typeCounts["Mid Nap"]} Mid, ${typeCounts["Sleep Session"]} Sleep\n`;
     output += `🍽️ Feeding: ${feedCounts.before} before, ${feedCounts.after} after, ${feedCounts.none} none\n\n`;
 
-    logs.forEach(log => {
-      const durMin = Math.round(toSeconds(log.duration) / 60);
-      const h = Math.floor(durMin / 60);
-      const m = durMin % 60;
-      const durStr = h ? `${h}h ${m}m` : `${m}m`;
-      output += `🕒 ${log.startTime.slice(0,5)} → ${log.endTime.slice(0,5)} | ${durStr} | 💤 ${log.sessionType} | 🍽️ ${log.feeding}\n`;
+    logs.forEach(l => {
+      const durMin = Math.round(toSeconds(l.duration) / 60),
+            h = Math.floor(durMin / 60),
+            m = durMin % 60,
+            durStr = h ? `${h}h ${m}m` : `${m}m`;
+      output += `🕒 ${l.startTime.slice(0,5)} → ${l.endTime.slice(0,5)} | ${durStr} | 💤 ${l.sessionType} | 🍽️ ${l.feeding}\n`;
     });
-
   }
 
-  // Display and show all relevant sections
   document.getElementById("summary-text").textContent = output;
-  document.getElementById("main-ui").classList.add("hidden");
-  document.getElementById("chart-section").classList.add("hidden");
-  document.getElementById("log-output").classList.remove("hidden");
   document.getElementById("copy-summary-btn").classList.remove("hidden");
-  document.getElementById("back-button").classList.remove("hidden");
 }
 
-
+// Today’s summary
 function showToday() {
   const today = new Date().toISOString().split("T")[0];
-  const todayLogs = sleepLog.filter(log => log.date === today);
-  displayLogs(todayLogs, `🗓️ Summary for ${today}`);
+  displayLogs(
+    sleepLog.filter(l => l.date === today),
+    `🗓️ Summary for ${today}`
+  );
 }
 
+// All sessions summary
 function showAll() {
   const grouped = {};
-  sleepLog.forEach(log => {
-    if (!grouped[log.date]) grouped[log.date] = [];
-    grouped[log.date].push(log);
+  sleepLog.forEach(l => {
+    grouped[l.date] = grouped[l.date] || [];
+    grouped[l.date].push(l);
   });
 
   let output = "📊 Overall Sleep Summary by Day:\n\n";
-  let totalSessions = 0;
-  let totalTime = 0;
+  let totalSessions = 0, totalTime = 0;
 
-  for (const date in grouped) {
+  Object.keys(grouped).sort().forEach(date => {
     const dayLogs = grouped[date];
-    const dayTotal = dayLogs.reduce((sum, log) => sum + toSeconds(log.duration), 0);
+    const dayTotal = dayLogs.reduce((sum, l) => sum + toSeconds(l.duration), 0);
     totalSessions += dayLogs.length;
     totalTime += dayTotal;
 
     output += `🗓️ ${date} | 🛌 ${dayLogs.length} | ⏱ ${formatDuration(dayTotal)}\n`;
-    dayLogs.forEach(log => {
-      output += `  💤 ${log.startTime.slice(0,5)} → ${log.endTime.slice(0,5)} | ${Math.round(toSeconds(log.duration)/60)}m | 🍽️ ${log.feeding}\n`;
+    dayLogs.forEach(l => {
+      output += `  💤 ${l.startTime.slice(0,5)} → ${l.endTime.slice(0,5)} | ${Math.round(toSeconds(l.duration)/60)}m | 🍽️ ${l.feeding}\n`;
     });
     output += "\n";
-  }
+  });
 
   output += `📅 ${Object.keys(grouped).length} days | 🛌 ${totalSessions} total | ⏱ ${formatDuration(totalTime)}`;
-  document.getElementById("log-output").textContent = output;
-  showView("log");
+  displayLogs([], output);
 }
 
+// Search by date
 function searchByDate() {
   const date = document.getElementById("date-input").value;
   if (!date) return alert("Please pick a date.");
-  const logs = sleepLog.filter(log => log.date === date);
-  displayLogs(logs, `📅 Sessions for ${date}`);
+  displayLogs(
+    sleepLog.filter(l => l.date === date),
+    `📅 Sessions for ${date}`
+  );
 }
 
+// Copy summary to clipboard
+function copySummary() {
+  const text = document.getElementById("summary-text").textContent;
+  if (!text.trim()) return alert("ℹ️ Nothing to copy.");
+  navigator.clipboard.writeText(text).then(() => alert("📋 Summary copied!"));
+}
+
+// Export to Excel
 function exportToExcel() {
   if (!sleepLog.length) return alert("No data to export.");
   const ws = XLSX.utils.json_to_sheet(sleepLog, {
@@ -173,31 +197,25 @@ function exportToExcel() {
   XLSX.writeFile(wb, "baby-sleep-logs.xlsx");
 }
 
-function copySummary() {
-  const text = document.getElementById("summary-text").textContent;
-  if (!text.trim()) return alert("ℹ️ Nothing to copy.");
-  navigator.clipboard.writeText(text).then(() => alert("📋 Summary copied!"));
-}
-
+// Visual summary: Chart.js
 function showChart() {
   showView("chart");
 
   [barChartInstance, pieChartInstance, lineChartInstance, feedStackedInstance].forEach(c => c?.destroy());
 
   const grouped = {}, typeTotals = { Nap: 0, "Mid Nap": 0, "Sleep Session": 0 };
-  const feedByDate = {}, avgSessionLengths = {}, dayMap = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const weekBuckets = Object.fromEntries(dayMap.map(d => [d, 0]));
+  const feedByDate = {}, avgSessionLengths = {};
+  const dayMap = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
   sleepLog.forEach(log => {
     const d = log.date;
-    if (!grouped[d]) grouped[d] = [];
+    grouped[d] = grouped[d] || [];
     grouped[d].push(log);
     typeTotals[log.sessionType]++;
-    feedByDate[d] = feedByDate[d] || { before: 0, after: 0, none: 0 };
+    feedByDate[d] = feedByDate[d] || { before:0, after:0, none:0 };
     feedByDate[d][log.feeding]++;
     avgSessionLengths[d] = avgSessionLengths[d] || [];
     avgSessionLengths[d].push(toSeconds(log.duration));
-    weekBuckets[dayMap[new Date(d).getDay()]] += toSeconds(log.duration) / 60;
   });
 
   const dates = Object.keys(grouped).sort();
@@ -209,83 +227,58 @@ function showChart() {
       labels: dates,
       datasets: [{
         label: "Total Sleep (min)",
-        data: dates.map(d => grouped[d].reduce((s,l)=>s+toSeconds(l.duration),0)/60),
-        backgroundColor: "#4fc3f7"
+        data: dates.map(d => grouped[d].reduce((s,l)=>s+toSeconds(l.duration),0)/60)
       }]
-    },
-    options: { plugins: { title: { display: true, text: "📊 Total Sleep per Day" } } }
+    }
   });
 
   pieChartInstance = new Chart(ctx("typePieChart"), {
     type: "pie",
     data: {
       labels: Object.keys(typeTotals),
-      datasets: [{
-        data: Object.values(typeTotals),
-        backgroundColor: ["#81c784", "#ffb74d", "#9575cd"]
-      }]
-    },
-    options: { plugins: { title: { display: true, text: "🧁 Session Type Breakdown" } } }
+      datasets: [{ data: Object.values(typeTotals) }]
+    }
   });
 
-  const avg7 = [];
-  for (let i = 0; i < dates.length; i++) {
-    const last7 = dates.slice(Math.max(0, i - 6), i + 1);
-    const total = last7.reduce((sum, d) =>
-      sum + (avgSessionLengths[d]?.reduce((a,b)=>a+b,0) || 0), 0);
-    const count = last7.reduce((sum, d) =>
-      sum + (avgSessionLengths[d]?.length || 0), 0);
-    avg7.push(Math.round(total / count / 60));
-  }
+  const avg7 = dates.map((_,i) => {
+    const slice = dates.slice(Math.max(0,i-6), i+1);
+    const sum = slice.reduce((s,d)=>s + avgSessionLengths[d].reduce((a,b)=>a+b,0), 0);
+    const cnt = slice.reduce((c,d)=>c + avgSessionLengths[d].length, 0);
+    return cnt ? Math.round(sum/cnt/60) : 0;
+  });
 
   lineChartInstance = new Chart(ctx("lineChart"), {
     type: "line",
     data: {
       labels: dates,
-      datasets: [{
-        label: "Avg Session (min)",
-        data: dates.map(d =>
-          Math.round(avgSessionLengths[d].reduce((a,b)=>a+b,0)/avgSessionLengths[d].length/60)
-        ),
-        borderColor: "#ff7043",
-        fill: false
-      }, {
-        label: "7-Day Avg",
-        data: avg7,
-        borderColor: "#9c27b0",
-        borderDash: [5, 5],
-        fill: false
-      }]
-    },
-    options: { plugins: { title: { display: true, text: "📈 Avg Session Duration by Day" } } }
+      datasets: [
+        { label: "Avg Session (min)", data: dates.map(d => Math.round(avgSessionLengths[d].reduce((a,b)=>a+b,0)/avgSessionLengths[d].length/60)) },
+        { label: "7-Day Avg", data: avg7, borderDash: [5,5] }
+      ]
+    }
   });
 
   feedStackedInstance = new Chart(ctx("feedStackedChart"), {
     type: "bar",
     data: {
       labels: dates,
-      datasets: ["before", "after", "none"].map((f, i) => ({
-        label: `Fed ${f}`,
-        data: dates.map(d => feedByDate[d]?.[f] || 0),
-        backgroundColor: ["#aed581", "#ff8a65", "#90a4ae"][i]
+      datasets: ["before","after","none"].map(f => ({
+        label: `Fed ${f}`, 
+        data: dates.map(d => feedByDate[d]?.[f] || 0)
       }))
     },
-    options: {
-      responsive: true,
-      plugins: {
-        title: { display: true, text: "🍽️ Feeding Status per Day" }
-      },
-      scales: { x: { stacked: true }, y: { stacked: true } }
-    }
+    options: { scales: { x: { stacked:true }, y: { stacked:true } } }
   });
 }
 
+// Dark mode toggle
 function toggleDarkMode() {
-  const enabled = document.getElementById("darkToggle").checked;
-  document.body.classList.toggle("dark", enabled);
-  localStorage.setItem("darkMode", enabled ? "true" : "false");
+  const on = document.getElementById("darkToggle").checked;
+  document.body.classList.toggle("dark", on);
+  localStorage.setItem("darkMode", on ? "true" : "false");
 }
 
+// On load
 window.addEventListener("DOMContentLoaded", () => {
   const saved = localStorage.getItem("darkMode") === "true";
   document.getElementById("darkToggle").checked = saved;
