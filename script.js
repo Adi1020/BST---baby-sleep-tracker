@@ -1,9 +1,3 @@
-/*
-  Baby Sleep Tracker
-  System Version: 1.2.4 (with merged Chart.js logic)
-  Last Updated: 2025-05-06
-*/
-
 let sleepLog = JSON.parse(localStorage.getItem("sleepLog")) || [];
 let startTime = localStorage.getItem("startTime")
   ? new Date(localStorage.getItem("startTime"))
@@ -90,11 +84,6 @@ function returnToMain() {
   document.getElementById("copy-summary-btn").classList.add("hidden");
   document.getElementById("summary-text").textContent = "";
   document.getElementById("back-button").classList.add("hidden");
-
-  // Reflow hack for PWA fullscreen
-  const log = document.getElementById("log-output");
-  log.style.display = "none";
-  setTimeout(() => log.style.display = "", 10);
 }
 
 // Build and display a textual summary
@@ -143,30 +132,49 @@ function showToday() {
 
 // All sessions summary
 function showAll() {
+  // 1) Reset UI
+  showView("log");                  // hides main-ui, shows log-output
+  document.getElementById("summary-text").textContent = "";
+  document.getElementById("copy-summary-btn").classList.add("hidden");
+
+  // 2) Group by date
   const grouped = {};
   sleepLog.forEach(l => {
     grouped[l.date] = grouped[l.date] || [];
     grouped[l.date].push(l);
   });
 
+  const dates = Object.keys(grouped).sort();
   let output = "📊 Overall Sleep Summary by Day:\n\n";
-  let totalSessions = 0, totalTime = 0;
 
-  Object.keys(grouped).sort().forEach(date => {
-    const dayLogs = grouped[date];
-    const dayTotal = dayLogs.reduce((sum, l) => sum + toSeconds(l.duration), 0);
-    totalSessions += dayLogs.length;
-    totalTime += dayTotal;
+  if (dates.length === 0) {
+    // No sessions at all
+    output = "❌ No sessions found.";
+  } else {
+    let totalSessions = 0, totalTime = 0;
 
-    output += `🗓️ ${date} | 🛌 ${dayLogs.length} | ⏱ ${formatDuration(dayTotal)}\n`;
-    dayLogs.forEach(l => {
-      output += `  💤 ${l.startTime.slice(0,5)} → ${l.endTime.slice(0,5)} | ${Math.round(toSeconds(l.duration)/60)}m | 🍽️ ${l.feeding}\n`;
+    dates.forEach(date => {
+      const dayLogs = grouped[date];
+      const dayTotal = dayLogs.reduce((sum, l) => sum + toSeconds(l.duration), 0);
+      totalSessions += dayLogs.length;
+      totalTime += dayTotal;
+
+      output += `🗓️ ${date} | 🛌 ${dayLogs.length} | ⏱ ${formatDuration(dayTotal)}\n`;
+      dayLogs.forEach(l => {
+        const mins = Math.round(toSeconds(l.duration) / 60);
+        output += `  💤 ${l.startTime.slice(0,5)} → ${l.endTime.slice(0,5)} | ${mins}m | 🍽️ ${l.feeding}\n`;
+      });
+      output += "\n";
     });
-    output += "\n";
-  });
 
-  output += `📅 ${Object.keys(grouped).length} days | 🛌 ${totalSessions} total | ⏱ ${formatDuration(totalTime)}`;
-  displayLogs([], output);
+    output += `📅 ${dates.length} days | 🛌 ${totalSessions} total | ⏱ ${formatDuration(totalTime)}`;
+  }
+
+  // 3) Inject into DOM
+  document.getElementById("summary-text").textContent = output;
+  if (dates.length > 0) {
+    document.getElementById("copy-summary-btn").classList.remove("hidden");
+  }
 }
 
 // Search by date
@@ -262,7 +270,7 @@ function showChart() {
     type: "bar",
     data: {
       labels: dates,
-      datasets: ["before","after","none"].map(f => ({
+      datasets: ["before","after"].map(f => ({
         label: `Fed ${f}`, 
         data: dates.map(d => feedByDate[d]?.[f] || 0)
       }))
